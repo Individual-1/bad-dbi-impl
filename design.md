@@ -24,6 +24,24 @@
 
 1. Eventually cache these basic blocks and do things like rewriting static jumps
 
+## Specific Things
+
+### Handling control-flow instructions
+
+#### ret
+
+Might need slightly different code for near vs far returns, but in general should be similar method.
+
+* Expect an address at `rsp`, change the ret to a jmp to dispatcher and use `[rsp]` as our next target
+
+#### jmp and related
+
+We could calculate out the jmp target and push it to stack and use the same code as for the ret handler? If it is a static jump target maybe we can bypass dispatcher and just write in the target address in our cache (if we have implemented an instrumented cache).
+
+#### loop/loopcc
+
+We could potentially treat this the same as a static jmp, except make sure we are saving and reloading context? Might not need to treat it any differently.
+
 ## Useful Resources
 
 * To be added
