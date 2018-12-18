@@ -26,6 +26,16 @@
 
 ## Specific Things
 
+### Setting up our dispatcher
+
+1. Read out first X bytes of child's rsp and back it up
+
+1. Write some bootstrap code into there that sets up a region of memory to write our dispatcher to
+
+1. Have it run the bootstrap then jump to some init code in the dispatcher that signals the parent to write the original code back in
+
+1. Set the dispatcher to start executing (with its translation functions) from the original child rsp
+
 ### Handling control-flow instructions
 
 #### ret
