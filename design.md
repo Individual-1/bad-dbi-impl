@@ -36,6 +36,12 @@
 
 1. Set the dispatcher to start executing (with its translation functions) from the original child rsp
 
+### Bootstrap for dispatcher
+
+1. Find a free region of memory to dump dispatcher in
+
+1. mmap it to be writeable and write our code in, then mprotect to make it executable
+
 ### Handling control-flow instructions
 
 #### ret
