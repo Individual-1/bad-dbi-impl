@@ -42,6 +42,36 @@
 
 1. mmap it to be writeable and write our code in, then mprotect to make it executable
 
+### Division of labor
+
+#### Child/Dispatcher
+
+* Checking if a given target address is in the cache
+
+* For cached results, just transfer execution to that block
+
+* For uncached results, put address of code and address of segment in cache to put instrumented code in
+
+* Upon resume from sigtrap, reset your register and stack state then jump to the newly instrumented block in cache
+
+#### Parent/Translator
+
+* When you get a sigtrap from the child, grab the registers and use that info to pull out the desired basic block from the child and write the translated block to the child memory cache
+
+* Instrumenting the read in basic block
+
+### Analyzing instructions
+
+Potential tools:
+
+* radare2
+
+* binja il
+
+* keystone
+
+* capstone
+
 ### Handling control-flow instructions
 
 #### ret
