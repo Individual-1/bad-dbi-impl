@@ -1,7 +1,8 @@
+extern crate errno;
 extern crate libc;
 extern crate nix;
 
-use errno:Errno;
+use errno::Errno;
 use libc::{execve, pid_t, uint64_t};
 use nix::Error;
 use nix::sys::ptrace;
@@ -60,6 +61,6 @@ fn exec_child(filename: &Path, args: &[Str]) ->() {
     let c_filename = &CString::new(filename.to_str().unwrap()).unwrap();
     ptrace::traceme();
     // TODO: Add args support
-    execve(c_filename, &[]], &[]).ok().expect("execve failed");
+    execve(c_filename, &[], &[]).ok().expect("execve failed");
     unreachable!();
 }

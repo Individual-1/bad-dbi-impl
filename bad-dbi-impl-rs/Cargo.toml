@@ -4,9 +4,6 @@ version = "0.1.0"
 authors = ["hello <a@b>"]
 
 [dependencies]
+errno = "*"
 libc = "*"
 nix = "*"
-
-[lib]
-name = "bad-dbi-impl-lib-rs"
-path = "src/lib.rs"
