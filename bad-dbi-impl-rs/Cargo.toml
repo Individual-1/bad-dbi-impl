@@ -4,6 +4,8 @@ version = "0.1.0"
 authors = ["hello <a@b>"]
 
 [dependencies]
+capstone = "*"
 errno = "*"
+keystone = "*"
 libc = "*"
 nix = "*"

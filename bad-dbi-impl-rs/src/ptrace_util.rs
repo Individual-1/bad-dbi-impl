@@ -98,3 +98,34 @@ fn unset_bp_v(pid: pid_t, bp: Breakpoint_v) -> Result<(), Error)> {
 
     return Ok();
 }
+
+fn read_mem_v(pid: pid_t, addr: usize, dst: &mut [u8]) -> Result<usize, Error)> {
+    let remote_iov = RemoteIoVec { base: addr, len: dst.len() };
+    let rnum = process_vm_readv(pid,
+                                &[IoVec::from_mut_slice(dst)],
+                                &[remote_iov]);
+    
+    if (rnum <= 0) {
+        return Err("Failed to read target");
+    }
+
+    return Ok(rnum);
+}
+
+fn write_mem_v(pid: pid_t, addr: usize, src: &[u8], len: usize) -> Result<usize, Error)> {
+    let mut wlen: usize = len;
+    if (len == 0) {
+        wlen = src.len();
+    }
+
+    let remote_iov = RemoteIoVec { base: addr, len: wlen };
+    let wnum = process_vm_writev(pid,
+                                 &[IoVec::from_slice(src)],
+                                 &[remote_iov]);
+
+    if (wnum != wlen) {
+        return Err("Failed to write full buffer");
+    }
+
+    return Ok(wnum);
+}
