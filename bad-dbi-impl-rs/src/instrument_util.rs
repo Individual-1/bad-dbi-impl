@@ -21,7 +21,7 @@ impl<'a> BasicBlock<'a> {
     }
 }
 
-fn disas_basic_block<'a>(pid: Pid, cs: &Capstone, addr: usize) -> Result<BasicBlock<'a>, &'static str> {
+fn disas_basic_block<'a>(pid: Pid, cs: &mut Capstone, addr: usize) -> Result<BasicBlock<'a>, &'static str> {
     let mut insn_buf: Vec<u8> = vec![0; INSN_BUFSIZE];
     let mut basic_block: BasicBlock = BasicBlock::new();
     let mut cur_addr: usize = addr;
@@ -30,7 +30,7 @@ fn disas_basic_block<'a>(pid: Pid, cs: &Capstone, addr: usize) -> Result<BasicBl
 
     while true {
         let mut rnum: usize = read_mem_v(pid, cur_addr, &mut insn_buf[..]).expect("Failed to read program memory");
-        let rval: (Instructions<'a>, usize) = check_for_basic_block(cs, &insn_buf[0 .. rnum], addr);
+        let rval: (Instructions<'a>, usize) = check_for_basic_block(cs, &insn_buf[0 .. rnum], cur_addr);
 
         /*
         * If rval.1 is non-zero, then we need to cache the instructions and do another read + basic block check loop
@@ -48,7 +48,7 @@ fn disas_basic_block<'a>(pid: Pid, cs: &Capstone, addr: usize) -> Result<BasicBl
     return Ok(basic_block);
 }
 
-fn check_for_basic_block<'a>(cs: &Capstone, code: &[u8], addr: usize) -> (Instructions<'a>, usize) {
+fn check_for_basic_block<'a>(cs: &mut Capstone, code: &[u8], addr: usize) -> (Instructions<'a>, usize) {
     let insns = cs.disasm_all(code, addr as u64).expect("Failed to disassemble instructions");
     let mut cnt: usize = 0;
     let mut found: bool = false;
