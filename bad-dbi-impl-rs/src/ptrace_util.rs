@@ -1,22 +1,14 @@
-extern crate errno;
-extern crate libc;
-extern crate nix;
-
-use errno::Errno;
-use libc::{c_long, c_uchar, execve, pid_t, uint64_t};
+use libc::{c_long, c_uchar};
 use nix::Error;
 use nix::sys::ptrace;
-use nix::sys::signal::Signal;
-use nix::sys::uio::{IoVec, RemoteIoVec, process_vm_readv, process_vm_writev}
-use nix::sys::wait::{waitpid, WaitPidFlag, WaitStatus};
-use nix::unistd::{fork, ForkResult};
-use std::ffi::{CString, c_void};
-use std::path::Path;
-use std::{mem, ptr};
+use nix::sys::uio::{IoVec, RemoteIoVec, process_vm_readv, process_vm_writev};
+use nix::unistd::{Pid};
+use std::ffi::{c_void};
+use std::{mem};
 
 struct Breakpoint {
     orig: c_long,
-    addr: AddressType,
+    addr: ptrace::AddressType,
 }
 
 struct Breakpoint_v {
@@ -24,7 +16,7 @@ struct Breakpoint_v {
     addr: usize,
 }
 
-fn set_bp(pid: pid_t, addr: ptrace::AddressType) -> Result<Breakpoint, Error> {
+fn set_bp(pid: Pid, addr: ptrace::AddressType) -> Result<Breakpoint, Error> {
     match ptrace::read(pid, addr) {
         Ok(word) => {
             // Create a mask that zeroes out the top byte
@@ -32,7 +24,7 @@ fn set_bp(pid: pid_t, addr: ptrace::AddressType) -> Result<Breakpoint, Error> {
             let patched_ptr: *mut c_void = &mut patched as *mut _ as *mut c_void;
             patched &= word;
             // Shift `int3` to the top byte and OR it into the masked word
-            patched |= (0xCC as c_long << ((mem::size_of<c_long>() - 1) * 8));
+            patched |= (0xCC as c_long) << ((mem::size_of::<c_long>() - 1) * 8);
             // Write our patched word in
             match ptrace::write(pid, addr, patched_ptr) {
                 Ok(_) => {
@@ -49,11 +41,11 @@ fn set_bp(pid: pid_t, addr: ptrace::AddressType) -> Result<Breakpoint, Error> {
     }
 }
 
-fn unset_bp(pid: pid_t, bp: Breakpoint) -> Result<(), Error)> {
+fn unset_bp(pid: Pid, bp: Breakpoint) -> Result<u8, nix::Error> {
     let bp_orig_ptr: *mut c_void = &mut bp.orig as *mut _ as *mut c_void;
     match ptrace::write(pid, bp.addr, bp_orig_ptr) {
         Ok(_) => {
-            return Ok();
+            return Ok(0);
         },
         Err(e) => {
             return Err(e);
@@ -61,14 +53,15 @@ fn unset_bp(pid: pid_t, bp: Breakpoint) -> Result<(), Error)> {
     }
 }
 
-fn set_bp_v(pid: pid_t, addr: usize) -> Result<Breakpoint_v, Error)> {
+fn set_bp_v(pid: Pid, addr: usize) -> Result<Breakpoint_v, &'static str> {
     // First, read the original byte value
     let mut orig = vec![0; 1];
     let remote_iov = RemoteIoVec { base: addr, len: 1 };
     let rnum = process_vm_readv(pid,
                                 &[IoVec::from_mut_slice(&mut orig)],
-                                &[remote_iov]);
-    if (rnum != 1) {
+                                &[remote_iov])
+                                .expect("Unexpected error in process_vm_readv");
+    if rnum != 1 {
         return Err("Failed to read target byte");
     }
     
@@ -76,54 +69,58 @@ fn set_bp_v(pid: pid_t, addr: usize) -> Result<Breakpoint_v, Error)> {
     let interrupt = vec![0xCC, 1];
     let wnum = process_vm_writev(pid,
                                  &[IoVec::from_slice(&interrupt)],
-                                 &[remote_iov]);
+                                 &[remote_iov])
+                                 .expect("Unexpected error in process_vm_writev");
 
-    if (wnum != 1) {
+    if wnum != 1 {
         return Err("Failed to write interrupt to target addr");
     }
 
     return Ok(Breakpoint_v { orig: orig[0], addr: addr });
 }
 
-fn unset_bp_v(pid: pid_t, bp: Breakpoint_v) -> Result<(), Error)> {
+fn unset_bp_v(pid: Pid, bp: Breakpoint_v) -> Result<u8, &'static str> {
     let orig = vec![bp.orig; 1];
-    let remote_iov = RemoteIoVec { base: addr, len: 1 };
+    let remote_iov = RemoteIoVec { base: bp.addr, len: 1 };
     let wnum = process_vm_writev(pid,
                                  &[IoVec::from_slice(&orig)],
-                                 &[remote_iov]);
+                                 &[remote_iov])
+                                 .expect("Unexpected error in process_vm_writev");
 
-    if (wnum != 1) {
+    if wnum != 1 {
         return Err("Failed to write original byte to target addr");
     }
 
-    return Ok();
+    return Ok(0);
 }
 
-fn read_mem_v(pid: pid_t, addr: usize, dst: &mut [u8]) -> Result<usize, Error)> {
+pub fn read_mem_v(pid: Pid, addr: usize, dst: &mut [u8]) -> Result<usize, &'static str> {
     let remote_iov = RemoteIoVec { base: addr, len: dst.len() };
     let rnum = process_vm_readv(pid,
                                 &[IoVec::from_mut_slice(dst)],
-                                &[remote_iov]);
+                                &[remote_iov])
+                                .expect("Unexpected error in process_vm_readv");
     
-    if (rnum <= 0) {
+    if rnum <= 0 {
         return Err("Failed to read target");
     }
 
     return Ok(rnum);
 }
 
-fn write_mem_v(pid: pid_t, addr: usize, src: &[u8], len: usize) -> Result<usize, Error)> {
+pub fn write_mem_v(pid: Pid, addr: usize, src: &[u8], len: usize) -> Result<usize, &'static str> {
     let mut wlen: usize = len;
-    if (len == 0) {
+    if len == 0 {
         wlen = src.len();
     }
 
     let remote_iov = RemoteIoVec { base: addr, len: wlen };
     let wnum = process_vm_writev(pid,
                                  &[IoVec::from_slice(src)],
-                                 &[remote_iov]);
+                                 &[remote_iov])
+                                 .expect("Unexpected error in process_vm_writev");
 
-    if (wnum != wlen) {
+    if wnum != wlen {
         return Err("Failed to write full buffer");
     }
 
