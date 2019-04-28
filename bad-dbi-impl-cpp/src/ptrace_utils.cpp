@@ -1,11 +1,23 @@
 #include "ptrace_utils.hpp"
 
+uint16_t set_breakpoint(void *addr) {
+    bp_t *bp;
+}
+
+bool unset_breakpoint(uint16_t bp_id) {
+
+}
+
+void print_breakpoints() {
+
+}
+
 /*
     This is a dumb method which doesn't parse instructions to figure out
     what to actually replace, in the future we can write a wrapper around this
     to be more intelligent about not destroying everything
 */
-bool ptrace_utils::set_bp_cc(pid_t pid, struct bp &bp) {
+bool ptrace_utils::set_bp_cc(bp_t &bp) {
     struct iovec local[1];
     struct iovec remote[1];
     uint8_t *cc_buf;
@@ -58,5 +70,28 @@ cleanup:
     free(cc_buf);
     cc_buf = NULL;
 
+    return result;
+}
+
+bool ptrace_utils::unset_bp_cc(bp_t &bp) {
+    struct iovec local[1];
+    struct iovec remote[1];
+    ssize_t nr;
+    bool result = false;
+
+    local[0].iov_base = (void *) bp.orig;
+    local[0].iov_len = bp.orig_len;
+
+    remote[0].iov_base = bp.addr;
+    remote[0].iov_len = bp.orig_len;
+
+    nr = process_vm_writev(pid, local, 1, remote, 1, 0);
+    if (nr != bp.orig_len) {
+        cout << "Failed to write original data into process\n";
+        goto cleanup;
+    }
+
+    result = true;
+cleanup:
     return result;
 }
